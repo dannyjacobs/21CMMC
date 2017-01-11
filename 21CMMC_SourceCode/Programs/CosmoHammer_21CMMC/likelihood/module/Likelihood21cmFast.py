@@ -18,7 +18,7 @@ McGreer_Redshift = 5.9
 QSO_Redshift = 7.0842
 
 class Likelihood21cmFast_multiz(object):
-    
+
     def __init__(self, k_values, PS_values, Error_k_values, PS_Error, Redshift, Foreground_cut, Shot_Noise_cut, ModUncert, PriorLegend, NFValsQSO, PDFValsQSO):
         self.k_values = k_values
         self.PS_values = PS_values
@@ -38,12 +38,12 @@ class Likelihood21cmFast_multiz(object):
         nf_vals = np.zeros(len(self.Redshift))
 
         # Generate a unique ID for each thread by sampling a randomly seeded distribution.
-        # Given than file I/O needs to be unique to each thread, it is beneficial to provide a unique ID in the off chance that two different threads 
+        # Given than file I/O needs to be unique to each thread, it is beneficial to provide a unique ID in the off chance that two different threads
         # end up with the same walker position (same parameter set)
         np.random.seed()
-        
+
         random_number = np.random.normal(size=1.0)
-    
+
         Individual_ID = Decimal(repr(random_number[0])).quantize(SIXPLACES)
 
         separator = " "
@@ -63,12 +63,13 @@ class Likelihood21cmFast_multiz(object):
         for i in range(len(self.Redshift)):
 
             # Run 21CMMC (the 21cmFAST code) to perform the reionisation simulation and recover the neutral fraction and 21cm PS
-            command = "./drive_21cmMC_streamlined %g %s 1"%(self.Redshift[i],StringArgument) 
+            command = "./drive_21cmMC_streamlined %g %s 1"%(self.Redshift[i],StringArgument)
             os.system(command)
 
             # Read in the neutral fraction and 21cm PS for this parameter set and redshift
             k_values_estimate = np.loadtxt('delTps_estimate_%s.txt'%(StringArgument_other), usecols=(0,))
             PS_values_estimate = np.loadtxt('delTps_estimate_%s.txt'%(StringArgument_other), usecols=(1,))
+            PS_values_estimate[np.isnan(PS_values_estimate)] = 0  #set NaN values to zero
             nf_value = np.loadtxt('NeutralFraction_%s.txt'%(StringArgument_other), usecols=(0,))
 
             nf_vals[i] = nf_value
@@ -84,14 +85,14 @@ class Likelihood21cmFast_multiz(object):
                 MockPS_Spline = interpolate.splrep(self.k_values[i],np.log10(self.PS_values[i]),s=0)
 
                 for ii in range(len(k_values_estimate)):
-                    if k_values_estimate[ii] >= self.Foreground_cut and k_values_estimate[ii] < self.Shot_Noise_cut: 
+                    if k_values_estimate[ii] >= self.Foreground_cut and k_values_estimate[ii] < self.Shot_Noise_cut:
 
                         # As the interpolation is performed in log space
                         MockPS_val = 10**(interpolate.splev(k_values_estimate[ii],MockPS_Spline,der=0))
                         ErrorPS_val = 10**(interpolate.splev(k_values_estimate[ii],PSError_Spline,der=0))
 
-                        total_sum += np.square((MockPS_val - PS_values_estimate[ii])/(np.sqrt(ErrorPS_val**2. + (self.ModUncert*PS_values_estimate[ii])**2.))) 
-       
+                        total_sum += np.square((MockPS_val - PS_values_estimate[ii])/(np.sqrt(ErrorPS_val**2. + (self.ModUncert*PS_values_estimate[ii])**2.)))
+
             # remove the temporary files
             command = "rm delTps_estimate_%s.txt"%(StringArgument_other)
             os.system(command)
@@ -125,9 +126,9 @@ class Likelihood21cmFast_multiz(object):
 
             for i in range(nZinterp):
                 ZExtrapVals[i] = ZExtrap_min + (ZExtrap_max - ZExtrap_min)*float(i)/(nZinterp - 1)
-    
+
                 XHI_ExtrapVals[i] = LinearInterpolationFunction(ZExtrapVals[i])
-            
+
                 # Ensure that the neutral fraction does not exceed unity, or go negative
                 if XHI_ExtrapVals[i] > 1.0:
                     XHI_ExtrapVals[i] = 1.0
@@ -138,8 +139,8 @@ class Likelihood21cmFast_multiz(object):
             separator_Planck = " "
             seq_Planck = []
             for i in range(nZinterp):
-                seq_Planck.append("%s"%(ZExtrapVals[i])) 
-                seq_Planck.append("%s"%(XHI_ExtrapVals[i]))    
+                seq_Planck.append("%s"%(ZExtrapVals[i]))
+                seq_Planck.append("%s"%(XHI_ExtrapVals[i]))
 
             StringArgument_Planck = string.join(seq_Planck,separator_Planck)
 
@@ -162,12 +163,12 @@ class Likelihood21cmFast_multiz(object):
             # Mean and one sigma errors for the McGreer et al. constraints
             # Modelled as a flat, unity prior at x_HI <= 0.06, and a one sided Gaussian at x_HI > 0.06 ( Gaussian of mean 0.06 and one sigma of 0.05 )
             McGreer_Mean = 0.06
-            McGreer_OneSigma = 0.05            
+            McGreer_OneSigma = 0.05
 
             if McGreer_Redshift in self.Redshift:
 
                 for i in range(len(self.Redshift)):
-                    if self.Redshift[i] == McGreer_Redshift:                        
+                    if self.Redshift[i] == McGreer_Redshift:
                         McGreer_NF = nf_vals[i]
 
                 if McGreer_NF > 1.:
@@ -212,7 +213,7 @@ class Likelihood21cmFast_multiz(object):
             if QSO_Redshift in self.Redshift:
 
                 for i in range(len(self.Redshift)):
-                    if self.Redshift[i] == QSO_Redshift:                        
+                    if self.Redshift[i] == QSO_Redshift:
                         NF_QSO = nf_vals[i]
 
                 # Ensure that the neutral fraction does not exceed unity, or go negative
@@ -234,7 +235,7 @@ class Likelihood21cmFast_multiz(object):
                 total_sum = total_sum + QSO_Prob
 
             elif len(self.Redshift) > 2:
-            
+
                 order = 1
 
                 # Check the redshift range input by the user to determine whether to interpolate or extrapolate the IGM neutral fraction to the QSO redshift
@@ -246,7 +247,7 @@ class Likelihood21cmFast_multiz(object):
                     LinearInterpolationFunction = InterpolatedUnivariateSpline(self.Redshift, nf_vals, k=order)
 
                     NF_QSO = LinearInterpolationFunction(QSO_Redshift)
-                            
+
                 else:
                     # The QSO redshift is within the range set by the user. Can interpolate the reionisation history to obtain the neutral fraction at the QSO redshift
 
@@ -279,4 +280,4 @@ class Likelihood21cmFast_multiz(object):
         return self.Likelihood(ctx)
 
     def setup(self):
-        print "Likelihood Fitting for 21cm Fast" 
+        print "Likelihood Fitting for 21cm Fast"
